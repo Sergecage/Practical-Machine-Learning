@@ -1,0 +1,93 @@
+---
+title: "Machine learning course project"
+author: "Sergei Keidzh"
+date: "12 July 2018"
+output: html_document
+----------------------
+
+##Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+#loading  libraries 
+```{r,echo=TRUE}
+setwd("D:/Game")
+library(caret)
+library(ggplot2)
+library(randomForest)
+library(rpart)
+set.seed(123456)
+```
+
+#Downloading the training and testing data
+```{r,echo=TRUE}
+library(data.table)
+training1 <- read.csv("D:/Game/pml-training.csv", na.strings=c("NA","#DIV/0!", ""))
+testing1 <- read.csv('D:/Game/pml-testing.csv', na.strings=c("NA","#DIV/0!", ""))
+str(training1)
+str(testing1)
+summary(training1)
+summary(testing1)
+```
+
+#To continue our analysis and for future predicting, we subset training.data for cross validation 
+```{r,echo+TRUE}
+summary(training1$classe)
+training1<-training1[,colSums(is.na(training1)) == 0]
+testing1<-testing1[,colSums(is.na(testing1)) == 0]
+training1   <-training1[,-c(1:7)]
+testing1 <-testing1[,-c(1:7)]
+dim(testing1)
+dim(training1)
+```
+#Above we splitted the training.data and testing.data
+
+```{r,echo=TRUE}
+inTrain<- createDataPartition(y=training1$classe, p=0.8, list=FALSE)
+subtraining <- training1[inTrain, ] 
+subtesting <- training1[-inTrain, ]
+```
+
+#Now take a look at the data
+```{r,echo=TRUE}
+plot(subtraining$classe, col="red", main="levels of variable classe in subsetting training data", xlab="classe_levels", ylab="frequency")
+```
+
+#Create a prediction 
+```{r,echo=TRUE}
+pred1<-rpart(classe ~ ., data=subtraining, method="class")
+prediction<-predict(pred1, subtesting, type = "class")
+```
+
+
+#Now use the Matrix
+```{r,echo=TRUE}
+confusionMatrix(prediction,subtesting$classe)
+```
+
+#Create the second prediction, this time using randomForest
+```{r,echo=TRUE}
+pred2 <- randomForest(classe ~. , data=subtraining,importance = TRUE, method="class",ntrees = 10, na.action = na.pass)
+prediction.random<- predict(pred2, subtesting, type = "class")
+confusionMatrix(prediction.random, subtesting$classe)
+```
+
+#As we see those two predictions have different results. To compare with first prediction  Random forest shows better algorithm. Accuracy of first prediction is 0.739, for Random Forest is 0.995. It is better to choose RandomForest model. Out-of-sample error is estimated at 0.005, (it means 0.5%).
+#The expected out-of-sample error is calculated as 1 - accuracy for predictions made against the cross-validation set.Testing data set comprises 20 cases. With an accuracy above 99% on our cross-validation data, we can expect that just some , or none, of the test samples will be missclassified
+
+#Try to using randomForest algorithm in the original testing data
+```{r,ECHO=TRUE}
+pred3 <- predict(pred2, testing1, type="class")
+pred3
+```
+
+#Submission
+```{r,echo=TRUE}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(pred3)
+```
